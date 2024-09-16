@@ -86,7 +86,7 @@ jobs:
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
         commit_message: '${{ env.PREPERATION_COMMIT }}'
-        file_pattern: 'powerplaints.csv'
+        file_pattern: 'powerplants.csv'
         tagging_message: '${{ github.ref_name }}'
         push_options: '--tags'
 
