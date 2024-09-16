@@ -5,57 +5,54 @@ on:
     tags:
       - v*.*.*
 
+env:
+  PREPERATION_COMMIT: '[github-actions.ci] auto update powerplants.csv'
+
 jobs:
-  build:
-    # Build the Python SDist and wheel, performs metadata and readme linting
-    name: Build and verify package
+  check-preperation:
+    name: Check if release is prepared
     runs-on: ubuntu-latest
+    outputs: 
+      prepared: ${{ steps.validate.outputs.prepared }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: hynek/build-and-inspect-python-package@v2
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-  release:
-    # Publish a GitHub release from the given git tag
-    name: Create GitHub Release
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: softprops/action-gh-release@v2
-        with:
-          body: |
-            Revised release notes are available in the [documentation](https://powerplantmatching.readthedocs.io/en/latest/release-notes.html).
-          append_body: true
-          generate_release_notes: true
+      - name: Validate commit message
+        id: validate
+        run: |
+          COMMIT_MESSAGE=$(git log -1 --pretty=%B)
+          echo "Expected: '${{ env.PREPERATION_COMMIT }}'"
+          echo "Received: '$COMMIT_MESSAGE'"
 
-  publish:
-    # Publish the built SDist and wheel from "dist" job to PyPI
-    name: Publish to PyPI
-    needs: [build]
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/powerplantmatching/
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: Packages
-          path: dist
-      - uses: pypa/gh-action-pypi-publish@release/v1
+          prepared="false"
+          if [[ "$COMMIT_MESSAGE" == "${{ env.PREPERATION_COMMIT }}" ]]; then
+            prepared="true"
+          fi
+
+          echo "prepared=$prepared" >> $GITHUB_OUTPUT
 
   update-dataset:
     name: Update powerplants.csv in repository
-    needs: [build]
+    needs: [check-preperation]
+    if: ${{ needs.check-preperation.outputs.prepared == 'false' }}
     runs-on: ubuntu-latest
     steps:
+    - name: Generate token for PyPSA Bot
+      id: generate-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ vars.PYPSA_BOT_ID }}
+        private-key: ${{ secrets.PYPSA_BOT_PRIVATE_KEY }}
+    
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0 # Needed for setuptools_scm
+        ref: ${{ github.ref_name }}
+        token: ${{ steps.generate-token.outputs.token }}
     
     - name: Set up Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v5.2.0
       with:
         python-version: 3.12
     
@@ -70,12 +67,49 @@ jobs:
         df = pm.powerplants(update=True)
         df.to_csv("powerplants.csv", index_label="id")
       shell: python
-    
-    - name: Create Pull Request
-      uses: peter-evans/create-pull-request@v6
+  
+    - name: Commit changes
+      uses: EndBug/add-and-commit@v9
       with:
-        commit-message: '[github-actions.ci] auto update `powerplants.csv`'
-        title: 'Update `powerplants.csv`'
-        body: 'This PR updates the `powerplants.csv` dataset after a new release.'
-        branch: 'auto-update-powerplants-csv'
-        base: 'master'
+        message: '${{ env.PREPERATION_COMMIT }}'
+        add: 'powerplants.csv'
+        tag: '${{ github.ref_name }} --force'
+        tag_push: '--force'
+
+  build:
+    name: Build and verify package
+    needs: [check-preperation]
+    if: ${{ needs.check-preperation.outputs.prepared == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hynek/build-and-inspect-python-package@v2
+
+  release:
+    name: Create GitHub Release
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v2
+        with:
+          body: |
+            Revised release notes are available in the [documentation](https://powerplantmatching.readthedocs.io/en/latest/release-notes.html).
+          append_body: true
+          generate_release_notes: true
+
+  # publish:
+  #   name: Publish to PyPI
+  #   needs: [build]
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: pypi
+  #     url: https://pypi.org/project/powerplantmatching/
+  #   permissions:
+  #     id-token: write
+  #   steps:
+  #     - uses: actions/download-artifact@v4
+  #       with:
+  #         name: Packages
+  #         path: dist
+  #     - uses: pypa/gh-action-pypi-publish@release/v1
