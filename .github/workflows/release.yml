@@ -65,13 +65,17 @@ jobs:
         df = pm.powerplants(update=True)
         df.to_csv("powerplants.csv", index_label="id")
       shell: python
+
+    - name: Remove previous tag
+      run: |
+        git tag -d ${{ github.ref_name }}
   
     - name: Commit changes
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
         commit_message: '${{ env.PREPERATION_COMMIT }}'
         file_pattern: 'powerplants.csv'
-        tagging_message: '${{ github.ref_name }} -f'
+        tagging_message: '${{ github.ref_name }}'
         push_options: '--tags --force-with-lease'
 
   build:
