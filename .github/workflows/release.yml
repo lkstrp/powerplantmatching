@@ -15,12 +15,12 @@ jobs:
     outputs: 
       prepared: ${{ steps.validate.outputs.prepared }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Validate commit message
         id: validate
         run: |
+          # Check if last commit is the expected commit message
           COMMIT_MESSAGE=$(git log -1 --pretty=%B)
           echo "Expected: '${{ env.PREPERATION_COMMIT }}'"
           echo "Received: '$COMMIT_MESSAGE'"
@@ -50,8 +50,7 @@ jobs:
         fetch-depth: 0
         token: ${{ steps.generate-token.outputs.token }}
     
-    - name: Set up Python
-      uses: actions/setup-python@v5.2.0
+    - uses: actions/setup-python@v5
       with:
         python-version: 3.12
     
@@ -70,9 +69,9 @@ jobs:
     - name: Commit changes
       uses: stefanzweifel/git-auto-commit-action@v5
       with:
-        commit_message: '${{ env.PREPERATION_COMMIT }}'
+        commit_message: '${{ env.PiREPERATION_COMMIT }}'
         file_pattern: 'powerplants.csv'
-        tagging_message: '${{ github.ref_name }}'
+        tagging_message: '${{ github.ref_name }} -f'
         push_options: '--tags --force-with-lease'
 
   build:
