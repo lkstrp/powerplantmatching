@@ -77,13 +77,18 @@ jobs:
         df.to_csv("powerplants.csv", index_label="id")
       shell: python
 
+    - name: Remove previous tag
+      run: |
+        git tag -d ${{ github.ref_name }}
+        git push origin --delete ${{ github.ref_name }}
+  
     - name: Commit changes
-      uses: EndBug/add-and-commit@v9
+      uses: stefanzweifel/git-auto-commit-action@v5
       with:
-        message: '${{ env.PREPERATION_COMMIT }}'
-        add: 'powerplants.csv'
-        tag: '${{ github.ref_name }} --force'
-        tag_push: '--force-with-lease'
+        commit_message: '${{ env.PREPERATION_COMMIT }}'
+        file_pattern: 'powerplaints.csv'
+        tagging_message: '${{ github.ref_name }}'
+        push_options: '--tags'
 
   build:
     name: Build and verify package
